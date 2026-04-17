@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-marketplace-evaluator"
+version = "0.1.0"
+description = "CLI for Claude Code marketplace health — routing evals, coverage checks, and semantic collision detection"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [
+    { name = "IceRhymers" },
+]
+
+dependencies = [
+    "anthropic>=0.40",
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+]
+
+[project.scripts]
+cme = "cme.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cme"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "pre-commit>=3.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cme"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/"]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
