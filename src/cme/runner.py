@@ -6,8 +6,6 @@ import asyncio
 import logging
 import os
 import random
-import tempfile
-from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -30,6 +28,29 @@ from claude_agent_sdk.types import (
 from .models import TestCase, TestResult
 
 logger = logging.getLogger("cme.runner")
+
+
+def _configure_debug_logging() -> None:
+    """Attach a stderr handler at INFO level when CME_DEBUG is set.
+
+    Without this, logger.info/logger.warning calls below go nowhere because
+    nothing configures Python logging at runtime. Idempotent across calls.
+    """
+    if not os.environ.get("CME_DEBUG"):
+        return
+    if any(getattr(h, "_cme_debug", False) for h in logger.handlers):
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+    handler._cme_debug = True  # type: ignore[attr-defined]
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 def _truncate(s: str, limit: int = 240) -> str:
@@ -122,7 +143,11 @@ def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
 
     Supports both a single-plugin layout (plugins_dir/skills/...) and a
     marketplace layout (plugins_dir/<plugin-name>/skills/...).
+
+    Paths are resolved to absolute so the spawned CLI subprocess doesn't
+    double-resolve them against its own cwd.
     """
+    plugins_dir = plugins_dir.resolve()
     if (plugins_dir / "skills").is_dir():
         return [SdkPluginConfig(type="local", path=str(plugins_dir))]
     return [
@@ -132,35 +157,13 @@ def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
     ]
 
 
-@lru_cache(maxsize=1)
-def _isolated_config_dir() -> str:
-    """One empty config dir per process, shared across all subprocess launches.
-
-    Points CLAUDE_CONFIG_DIR at a scratch directory so the bundled CLI never
-    reads ~/.claude (user skills, plugins, settings). Keeps routing evals
-    hermetic regardless of what the developer has installed locally.
-    """
-    return tempfile.mkdtemp(prefix="cme-claude-config-")
-
-
 def _build_sdk_env() -> dict[str, str]:
-    env = dict(os.environ)
-    overrides = {
-        "ANTHROPIC_AUTH_TOKEN": os.environ.get("ANTHROPIC_AUTH_TOKEN", ""),
-        "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        or os.environ.get("ANTHROPIC_API_KEY", ""),
-        "ANTHROPIC_BASE_URL": os.environ.get("ANTHROPIC_BASE_URL", ""),
-        "ANTHROPIC_MODEL": os.environ.get("ANTHROPIC_MODEL", ""),
-        "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": os.environ.get(
-            "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "1"
-        ),
-        "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": os.environ.get(
-            "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", ""
-        ),
-        "CLAUDE_CONFIG_DIR": _isolated_config_dir(),
-    }
-    env.update({k: v for k, v in overrides.items() if v != ""})
-    return env
+    # Pass the caller's environment through unchanged so any auth configuration
+    # (ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, etc.)
+    # reaches the CLI without cme introducing collisions.
+    # Plugin isolation is handled by setting_sources=[] in ClaudeAgentOptions,
+    # which skips the user settings source and the global plugin registry.
+    return dict(os.environ)
 
 
 async def _run_prompt(
@@ -177,6 +180,32 @@ async def _run_prompt(
     options = ClaudeAgentOptions(
         plugins=plugin_entries,
         allowed_tools=["Skill", "Read", "Glob", "Grep"],
+        disallowed_tools=[
+            "Bash",
+            "Write",
+            "Edit",
+            "NotebookEdit",
+            "WebFetch",
+            "WebSearch",
+            "TodoWrite",
+            "Task",
+            "AskUserQuestion",
+            "ToolSearch",
+            "EnterPlanMode",
+            "ExitPlanMode",
+            "EnterWorktree",
+            "ExitWorktree",
+            "CronCreate",
+            "CronDelete",
+            "CronList",
+            "Monitor",
+            "PushNotification",
+            "RemoteTrigger",
+            "ScheduleWakeup",
+            "TaskOutput",
+            "TaskStop",
+        ],
+        mcp_servers={},
         permission_mode="bypassPermissions",
         system_prompt={
             "type": "preset",
@@ -191,7 +220,7 @@ async def _run_prompt(
         setting_sources=[],
         max_turns=test.max_turns,
         model=test.model,
-        cwd=str(plugins_dir),
+        cwd=str(plugins_dir.resolve()),
         env=sdk_env,
         stderr=lambda line: logger.warning("CLI[%s] %s", test.name, line),
         extra_args=extra_args,
@@ -298,6 +327,7 @@ async def run_all(
     threshold: float = 95.0,
 ) -> int:
     """Run all tests, print summary, return exit code."""
+    _configure_debug_logging()
     print(f"Running {len(tests)} routing eval(s) with {workers} worker(s)...")
     semaphore = asyncio.Semaphore(workers)
 
