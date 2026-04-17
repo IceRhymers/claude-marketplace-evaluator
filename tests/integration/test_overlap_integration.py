@@ -9,6 +9,7 @@ Run with: make test-integration
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +17,8 @@ import pytest
 from click.testing import CliRunner
 
 from cme.cli import main
+
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 EXAMPLE_PLUGINS = REPO_ROOT / "example_plugins"
@@ -77,9 +80,11 @@ class TestOverlapIntegration:
                     str(output),
                 ],
             )
+        logger.info("exit_code=%s\n%s", result.exit_code, result.output)
         assert result.exit_code == 0, result.output
         assert "PASSED" in result.output
         data = json.loads(output.read_text())
+        logger.info("report=%s", json.dumps(data, indent=2))
         assert data["total_collisions"] == 0
 
     def test_collision_plugin_detected(self, tmp_path: Path) -> None:
@@ -99,9 +104,11 @@ class TestOverlapIntegration:
                     str(output),
                 ],
             )
+        logger.info("exit_code=%s\n%s", result.exit_code, result.output)
         assert result.exit_code == 1
         assert "FAILED" in result.output
         data = json.loads(output.read_text())
+        logger.info("report=%s", json.dumps(data, indent=2))
         assert data["total_collisions"] == 1
         collision = data["collisions"][0]
         assert (
@@ -116,7 +123,7 @@ class TestOverlapIntegration:
             "cme.overlap.anthropic.Anthropic", return_value=_mock_no_collisions()
         ):
             runner = CliRunner()
-            runner.invoke(
+            result = runner.invoke(
                 main,
                 [
                     "overlap",
@@ -126,7 +133,9 @@ class TestOverlapIntegration:
                     str(output),
                 ],
             )
+        logger.info("exit_code=%s\n%s", result.exit_code, result.output)
         data = json.loads(output.read_text())
+        logger.info("report=%s", json.dumps(data, indent=2))
         assert "timestamp" in data
         assert "model_used" in data
         assert "total_skills_analyzed" in data
@@ -141,7 +150,7 @@ class TestOverlapIntegration:
             "cme.overlap.anthropic.Anthropic", return_value=_mock_no_collisions()
         ):
             runner = CliRunner()
-            runner.invoke(
+            result = runner.invoke(
                 main,
                 [
                     "overlap",
@@ -151,6 +160,8 @@ class TestOverlapIntegration:
                     str(output),
                 ],
             )
+        logger.info("exit_code=%s\n%s", result.exit_code, result.output)
         data = json.loads(output.read_text())
+        logger.info("report=%s", json.dumps(data, indent=2))
         # incomplete-plugin has 4 skills — all counted, not just those with evals
         assert data["total_skills_analyzed"] == 4

@@ -91,6 +91,8 @@ async def _run_prompt(
         model=test.model,
         cwd=str(plugins_dir),
         env=sdk_env,
+        stderr=lambda line: logger.warning("CLI[%s] %s", test.name, line),
+        extra_args={"debug": "api,hooks"} if os.environ.get("CME_DEBUG") else {},
     )
 
     for attempt in range(max_retries + 1):
