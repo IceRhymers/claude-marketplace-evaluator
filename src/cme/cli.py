@@ -165,6 +165,11 @@ def overlap(plugins_dir: str, output: str, model: str | None) -> None:
         for sev, count in by_severity.items():
             if count:
                 click.echo(f"  {sev}: {count}")
+
+        click.echo("\n--- Overlap Report (JSON) ---")
+        click.echo(output_path.read_text())
+        click.echo("--- End Report ---")
+
         click.secho(
             "\nFAILED: collisions detected — resolve before merging.",
             fg="red",
