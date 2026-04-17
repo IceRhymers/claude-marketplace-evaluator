@@ -144,26 +144,13 @@ def _isolated_config_dir() -> str:
 
 
 def _build_sdk_env() -> dict[str, str]:
+    # Pass the caller's environment through unchanged so any auth configuration
+    # (ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, etc.)
+    # reaches the CLI without cme introducing empty-string collisions.
+    # The only override is CLAUDE_CONFIG_DIR, which keeps routing evals hermetic
+    # by preventing local skills/plugins from bleeding into results.
     env = dict(os.environ)
-    overrides = {
-        "ANTHROPIC_AUTH_TOKEN": os.environ.get("ANTHROPIC_AUTH_TOKEN", ""),
-        "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        or os.environ.get("ANTHROPIC_API_KEY", ""),
-        "ANTHROPIC_BASE_URL": os.environ.get("ANTHROPIC_BASE_URL", ""),
-        "ANTHROPIC_MODEL": os.environ.get("ANTHROPIC_MODEL", ""),
-        "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": os.environ.get(
-            "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "1"
-        ),
-        "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": os.environ.get(
-            "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", ""
-        ),
-        # Always isolate the config dir so local skills/plugins don't bleed into
-        # routing evals. OAuth users can authenticate via CLAUDE_CODE_OAUTH_TOKEN
-        # (generated once with `claude setup-token`) instead of ~/.claude.
-        "CLAUDE_CONFIG_DIR": _isolated_config_dir(),
-        "CLAUDE_CODE_OAUTH_TOKEN": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", ""),
-    }
-    env.update({k: v for k, v in overrides.items() if v != ""})
+    env["CLAUDE_CONFIG_DIR"] = _isolated_config_dir()
     return env
 
 
