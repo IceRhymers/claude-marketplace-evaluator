@@ -30,6 +30,29 @@ from .models import TestCase, TestResult
 logger = logging.getLogger("cme.runner")
 
 
+def _configure_debug_logging() -> None:
+    """Attach a stderr handler at INFO level when CME_DEBUG is set.
+
+    Without this, logger.info/logger.warning calls below go nowhere because
+    nothing configures Python logging at runtime. Idempotent across calls.
+    """
+    if not os.environ.get("CME_DEBUG"):
+        return
+    if any(getattr(h, "_cme_debug", False) for h in logger.handlers):
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+    handler._cme_debug = True  # type: ignore[attr-defined]
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+
 def _truncate(s: str, limit: int = 240) -> str:
     s = s.replace("\n", " ")
     return s if len(s) <= limit else s[:limit] + "…"
@@ -120,7 +143,11 @@ def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
 
     Supports both a single-plugin layout (plugins_dir/skills/...) and a
     marketplace layout (plugins_dir/<plugin-name>/skills/...).
+
+    Paths are resolved to absolute so the spawned CLI subprocess doesn't
+    double-resolve them against its own cwd.
     """
+    plugins_dir = plugins_dir.resolve()
     if (plugins_dir / "skills").is_dir():
         return [SdkPluginConfig(type="local", path=str(plugins_dir))]
     return [
@@ -153,6 +180,32 @@ async def _run_prompt(
     options = ClaudeAgentOptions(
         plugins=plugin_entries,
         allowed_tools=["Skill", "Read", "Glob", "Grep"],
+        disallowed_tools=[
+            "Bash",
+            "Write",
+            "Edit",
+            "NotebookEdit",
+            "WebFetch",
+            "WebSearch",
+            "TodoWrite",
+            "Task",
+            "AskUserQuestion",
+            "ToolSearch",
+            "EnterPlanMode",
+            "ExitPlanMode",
+            "EnterWorktree",
+            "ExitWorktree",
+            "CronCreate",
+            "CronDelete",
+            "CronList",
+            "Monitor",
+            "PushNotification",
+            "RemoteTrigger",
+            "ScheduleWakeup",
+            "TaskOutput",
+            "TaskStop",
+        ],
+        mcp_servers={},
         permission_mode="bypassPermissions",
         system_prompt={
             "type": "preset",
@@ -167,7 +220,7 @@ async def _run_prompt(
         setting_sources=[],
         max_turns=test.max_turns,
         model=test.model,
-        cwd=str(plugins_dir),
+        cwd=str(plugins_dir.resolve()),
         env=sdk_env,
         stderr=lambda line: logger.warning("CLI[%s] %s", test.name, line),
         extra_args=extra_args,
@@ -274,6 +327,7 @@ async def run_all(
     threshold: float = 95.0,
 ) -> int:
     """Run all tests, print summary, return exit code."""
+    _configure_debug_logging()
     print(f"Running {len(tests)} routing eval(s) with {workers} worker(s)...")
     semaphore = asyncio.Semaphore(workers)
 
