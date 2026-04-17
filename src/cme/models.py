@@ -64,3 +64,23 @@ class CoverageReport(BaseModel):
         if self.total_skills == 0:
             return 100.0
         return self.skills_with_evals / self.total_skills * 100
+
+
+class CollisionPair(BaseModel):
+    """A detected semantic collision between two skills."""
+
+    skill_a: str  # relative path, e.g. "plugins/p/skills/a"
+    skill_b: str
+    overlapping_triggers: list[str]
+    description_excerpts: list[str]
+    severity: str  # "high" | "medium" | "low"
+
+
+class OverlapReport(BaseModel):
+    """Full overlap detection report."""
+
+    timestamp: str
+    model_used: str
+    total_skills_analyzed: int
+    total_collisions: int
+    collisions: list[CollisionPair]
