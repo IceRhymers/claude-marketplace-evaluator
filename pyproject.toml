@@ -14,7 +14,7 @@ authors = [
 ]
 
 dependencies = [
-    "anthropic>=0.40",
+    "claude-agent-sdk>=0.1.37",
     "click>=8.0",
     "pyyaml>=6.0",
     "pydantic>=2.0",
@@ -32,6 +32,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pre-commit>=3.0",
+    "types-PyYAML>=6.0",
 ]
 
 [tool.ruff]

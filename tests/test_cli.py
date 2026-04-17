@@ -14,11 +14,10 @@ def test_help() -> None:
     assert "marketplace health" in result.output
 
 
-def test_routing_stub() -> None:
+def test_routing_no_default_plugins() -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["routing"])
-    assert result.exit_code == 0
-    assert "not implemented" in result.output
+    assert result.exit_code != 0
 
 
 def test_overlap_stub() -> None:
