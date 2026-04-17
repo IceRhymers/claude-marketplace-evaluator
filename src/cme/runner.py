@@ -6,8 +6,6 @@ import asyncio
 import logging
 import os
 import random
-import tempfile
-from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -132,26 +130,13 @@ def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
     ]
 
 
-@lru_cache(maxsize=1)
-def _isolated_config_dir() -> str:
-    """One empty config dir per process, shared across all subprocess launches.
-
-    Points CLAUDE_CONFIG_DIR at a scratch directory so the bundled CLI never
-    reads ~/.claude (user skills, plugins, settings). Keeps routing evals
-    hermetic regardless of what the developer has installed locally.
-    """
-    return tempfile.mkdtemp(prefix="cme-claude-config-")
-
-
 def _build_sdk_env() -> dict[str, str]:
     # Pass the caller's environment through unchanged so any auth configuration
     # (ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, etc.)
-    # reaches the CLI without cme introducing empty-string collisions.
-    # The only override is CLAUDE_CONFIG_DIR, which keeps routing evals hermetic
-    # by preventing local skills/plugins from bleeding into results.
-    env = dict(os.environ)
-    env["CLAUDE_CONFIG_DIR"] = _isolated_config_dir()
-    return env
+    # reaches the CLI without cme introducing collisions.
+    # Plugin isolation is handled by setting_sources=[] in ClaudeAgentOptions,
+    # which skips the user settings source and the global plugin registry.
+    return dict(os.environ)
 
 
 async def _run_prompt(
