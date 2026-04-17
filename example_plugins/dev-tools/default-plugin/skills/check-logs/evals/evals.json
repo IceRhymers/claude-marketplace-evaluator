@@ -1,0 +1,21 @@
+[
+  { "query": "Check the server logs for errors", "should_trigger": true },
+  {
+    "query": "What errors happened in the application logs today?",
+    "should_trigger": true
+  },
+  {
+    "query": "Show me the last 50 lines of the error log",
+    "should_trigger": true
+  },
+  {
+    "query": "Are there any warnings in the service output?",
+    "should_trigger": true
+  },
+  { "query": "Tail the nginx access log", "should_trigger": true },
+  {
+    "query": "Open a pull request for my feature branch",
+    "should_trigger": false
+  },
+  { "query": "Run the integration tests", "should_trigger": false }
+]

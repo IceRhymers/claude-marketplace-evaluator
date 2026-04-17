@@ -1,0 +1,15 @@
+[
+  {
+    "query": "Create a pull request for my feature branch",
+    "should_trigger": true
+  },
+  { "query": "Open a PR from this branch to main", "should_trigger": true },
+  {
+    "query": "Make a pull request with my latest changes",
+    "should_trigger": true
+  },
+  { "query": "Push and create a PR for review", "should_trigger": true },
+  { "query": "Run the test suite", "should_trigger": false },
+  { "query": "Check the deployment status", "should_trigger": false },
+  { "query": "Show me the git log", "should_trigger": false }
+]

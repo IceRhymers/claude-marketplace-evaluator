@@ -1,4 +1,4 @@
-.PHONY: install routing overlap lint fmt fmt-check typecheck check test
+.PHONY: install routing overlap lint fmt fmt-check typecheck check test test-integration
 
 install:
 	uv sync
@@ -25,3 +25,6 @@ check: lint fmt-check typecheck
 
 test:
 	uv run pytest
+
+test-integration:
+	uv run pytest -m integration tests/integration/

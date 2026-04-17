@@ -1,0 +1,15 @@
+[
+  { "query": "Open a pull request for my changes", "should_trigger": true },
+  { "query": "Create a PR from this branch to main", "should_trigger": true },
+  {
+    "query": "Push this branch and submit it for review",
+    "should_trigger": true
+  },
+  { "query": "Send my changes upstream as a PR", "should_trigger": true },
+  { "query": "Run the test suite", "should_trigger": false },
+  {
+    "query": "Show me the application logs from yesterday",
+    "should_trigger": false
+  },
+  { "query": "Deploy the service to production", "should_trigger": false }
+]

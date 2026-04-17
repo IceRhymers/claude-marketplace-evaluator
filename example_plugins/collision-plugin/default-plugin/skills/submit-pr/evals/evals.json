@@ -1,0 +1,12 @@
+[
+  { "query": "Submit a pull request for this branch", "should_trigger": true },
+  { "query": "Send my changes as a PR for review", "should_trigger": true },
+  {
+    "query": "Submit a PR from feature branch to main",
+    "should_trigger": true
+  },
+  { "query": "Publish this branch as a pull request", "should_trigger": true },
+  { "query": "Deploy the application", "should_trigger": false },
+  { "query": "Run the linter on the project", "should_trigger": false },
+  { "query": "Check the server error logs", "should_trigger": false }
+]

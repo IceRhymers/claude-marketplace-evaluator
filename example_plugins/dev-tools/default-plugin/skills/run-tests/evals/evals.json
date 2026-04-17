@@ -1,0 +1,10 @@
+[
+  { "query": "Run the test suite for this project", "should_trigger": true },
+  { "query": "Can you execute the unit tests?", "should_trigger": true },
+  { "query": "Check if all my specs pass", "should_trigger": true },
+  { "query": "Run pytest on the src directory", "should_trigger": true },
+  { "query": "Are there any test failures?", "should_trigger": true },
+  { "query": "Open a pull request for this branch", "should_trigger": false },
+  { "query": "Show me the server error logs", "should_trigger": false },
+  { "query": "Deploy the service to staging", "should_trigger": false }
+]
