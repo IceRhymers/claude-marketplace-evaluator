@@ -84,7 +84,12 @@ async def _run_prompt(
         system_prompt={
             "type": "preset",
             "preset": "claude_code",
-            "append": "Never ask clarifying questions. Invoke skills directly.",
+            "append": (
+                "If a skill matches the request, invoke it immediately via the "
+                "Skill tool on your very first turn. Do not read files, run "
+                "commands, or explore the workspace before invoking the skill. "
+                "Never ask clarifying questions."
+            ),
         },
         setting_sources=["project"],
         max_turns=test.max_turns,
