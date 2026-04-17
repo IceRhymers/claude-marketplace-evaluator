@@ -151,9 +151,6 @@ def _build_sdk_env() -> dict[str, str]:
         or os.environ.get("ANTHROPIC_API_KEY", ""),
         "ANTHROPIC_BASE_URL": os.environ.get("ANTHROPIC_BASE_URL", ""),
         "ANTHROPIC_MODEL": os.environ.get("ANTHROPIC_MODEL", ""),
-        "ANTHROPIC_CUSTOM_HEADERS": os.environ.get(
-            "ANTHROPIC_CUSTOM_HEADERS", "x-databricks-use-coding-agent-mode: true"
-        ),
         "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": os.environ.get(
             "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", "1"
         ),
