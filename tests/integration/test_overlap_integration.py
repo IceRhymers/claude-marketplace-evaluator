@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 EXAMPLE_PLUGINS = REPO_ROOT / "example_plugins"
+
+_HAS_ANTHROPIC_AUTH = bool(
+    os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+)
 
 
 def _mock_no_collisions() -> MagicMock:
@@ -165,3 +170,57 @@ class TestOverlapIntegration:
         logger.info("report=%s", json.dumps(data, indent=2))
         # incomplete-plugin has 4 skills — all counted, not just those with evals
         assert data["total_skills_analyzed"] == 4
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not _HAS_ANTHROPIC_AUTH,
+    reason="Live overlap detection requires ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN",
+)
+class TestLiveOverlap:
+    """Real end-to-end overlap detection — hits the Anthropic API, no mocks.
+
+    Slow and costs tokens. Skipped automatically without auth.
+    """
+
+    def _run_overlap(self, plugin: str, tmp_path: Path) -> tuple[int, str, dict]:
+        output = tmp_path / "report.json"
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "overlap",
+                "--plugins-dir",
+                str(EXAMPLE_PLUGINS / plugin),
+                "--output",
+                str(output),
+            ],
+        )
+        data = json.loads(output.read_text())
+        logger.info(
+            "[%s] exit_code=%s output=%s\nreport=%s",
+            plugin,
+            result.exit_code,
+            result.output,
+            json.dumps(data, indent=2),
+        )
+        return result.exit_code, result.output, data
+
+    def test_dev_tools_no_collisions(self, tmp_path: Path) -> None:
+        """dev-tools has 3 clearly distinct skills — model should find 0 collisions."""
+        exit_code, _output, data = self._run_overlap("dev-tools", tmp_path)
+        assert exit_code == 0
+        assert data["total_skills_analyzed"] == 3
+        assert data["total_collisions"] == 0
+
+    def test_collision_plugin_detected(self, tmp_path: Path) -> None:
+        """collision-plugin has create-pr + submit-pr — model should flag the overlap."""
+        exit_code, output, data = self._run_overlap("collision-plugin", tmp_path)
+        assert exit_code == 1, output
+        assert data["total_skills_analyzed"] == 2
+        assert data["total_collisions"] >= 1
+        paths = {c["skill_a"] for c in data["collisions"]} | {
+            c["skill_b"] for c in data["collisions"]
+        }
+        assert any("create-pr" in p for p in paths)
+        assert any("submit-pr" in p for p in paths)
