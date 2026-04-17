@@ -83,6 +83,10 @@ def routing(
             raise SystemExit(1)
 
         # Step 3: Eval runner
+        if threshold <= 0:
+            click.echo("\n[3/3] Skipping routing evals (--threshold 0).")
+            raise SystemExit(0)
+
         all_yaml = out_dir / "all.yaml"
         if not all_yaml.exists():
             click.secho(
