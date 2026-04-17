@@ -157,8 +157,14 @@ def _build_sdk_env() -> dict[str, str]:
         "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": os.environ.get(
             "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", ""
         ),
-        "CLAUDE_CONFIG_DIR": _isolated_config_dir(),
     }
+    # Only isolate the config dir when explicit API credentials are provided.
+    # Without them, the Claude CLI needs ~/.claude for OAuth authentication.
+    has_explicit_creds = bool(
+        os.environ.get("ANTHROPIC_AUTH_TOKEN") or os.environ.get("ANTHROPIC_API_KEY")
+    )
+    if has_explicit_creds:
+        overrides["CLAUDE_CONFIG_DIR"] = _isolated_config_dir()
     env.update({k: v for k, v in overrides.items() if v != ""})
     return env
 
