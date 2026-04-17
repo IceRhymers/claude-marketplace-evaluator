@@ -51,7 +51,7 @@ def test_coverage_report_pct_zero_skills() -> None:
 
 def test_test_case_defaults() -> None:
     tc = TestCase(name="x", prompt="do X", expected_skill="my-skill")
-    assert tc.max_turns == 5
+    assert tc.max_turns is None
     assert tc.model is None
 
 
