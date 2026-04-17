@@ -6,6 +6,8 @@ import asyncio
 import logging
 import os
 import random
+import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -15,11 +17,78 @@ from claude_agent_sdk import (
     ResultMessage,
     query,
 )
-from claude_agent_sdk.types import ToolUseBlock
+from claude_agent_sdk.types import (
+    SdkPluginConfig,
+    SystemMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
 
 from .models import TestCase, TestResult
 
 logger = logging.getLogger("cme.runner")
+
+
+def _truncate(s: str, limit: int = 240) -> str:
+    s = s.replace("\n", " ")
+    return s if len(s) <= limit else s[:limit] + "…"
+
+
+def _debug_log_message(test_name: str, message: object) -> None:
+    """Emit a one-line summary of each SDK message for debugging."""
+    if isinstance(message, SystemMessage):
+        data = message.data or {}
+        if message.subtype == "init":
+            plugins = [p.get("name") for p in data.get("plugins", [])]
+            logger.info(
+                "[%s] INIT model=%s plugins=%s skills=%s tools=%s",
+                test_name,
+                data.get("model"),
+                plugins,
+                data.get("skills", []),
+                data.get("tools", []),
+            )
+        else:
+            logger.info(
+                "[%s] SYSTEM.%s %s",
+                test_name,
+                message.subtype,
+                _truncate(str(data)),
+            )
+    elif isinstance(message, AssistantMessage):
+        for block in message.content:
+            if isinstance(block, ThinkingBlock):
+                logger.info("[%s] THINK %s", test_name, _truncate(block.thinking))
+            elif isinstance(block, TextBlock):
+                logger.info("[%s] TEXT %s", test_name, _truncate(block.text))
+            elif isinstance(block, ToolUseBlock):
+                logger.info(
+                    "[%s] TOOL_USE %s input=%s",
+                    test_name,
+                    block.name,
+                    _truncate(str(block.input)),
+                )
+    elif isinstance(message, UserMessage):
+        for user_block in message.content:
+            if isinstance(user_block, ToolResultBlock):
+                logger.info(
+                    "[%s] TOOL_RESULT error=%s %s",
+                    test_name,
+                    user_block.is_error,
+                    _truncate(str(user_block.content)),
+                )
+    elif isinstance(message, ResultMessage):
+        logger.info(
+            "[%s] RESULT subtype=%s turns=%s error=%s stop=%s",
+            test_name,
+            message.subtype,
+            message.num_turns,
+            message.is_error,
+            message.stop_reason,
+        )
 
 
 def skill_matches(expected: str, invoked: set[str]) -> bool:
@@ -48,6 +117,32 @@ def _check_pass(skills_invoked: list[str], test: TestCase) -> bool:
     return False
 
 
+def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
+    """Register each inner plugin (dir containing a skills/ subdir) separately.
+
+    Supports both a single-plugin layout (plugins_dir/skills/...) and a
+    marketplace layout (plugins_dir/<plugin-name>/skills/...).
+    """
+    if (plugins_dir / "skills").is_dir():
+        return [SdkPluginConfig(type="local", path=str(plugins_dir))]
+    return [
+        SdkPluginConfig(type="local", path=str(p))
+        for p in sorted(plugins_dir.iterdir())
+        if p.is_dir() and (p / "skills").is_dir()
+    ]
+
+
+@lru_cache(maxsize=1)
+def _isolated_config_dir() -> str:
+    """One empty config dir per process, shared across all subprocess launches.
+
+    Points CLAUDE_CONFIG_DIR at a scratch directory so the bundled CLI never
+    reads ~/.claude (user skills, plugins, settings). Keeps routing evals
+    hermetic regardless of what the developer has installed locally.
+    """
+    return tempfile.mkdtemp(prefix="cme-claude-config-")
+
+
 def _build_sdk_env() -> dict[str, str]:
     env = dict(os.environ)
     overrides = {
@@ -65,6 +160,7 @@ def _build_sdk_env() -> dict[str, str]:
         "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": os.environ.get(
             "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING", ""
         ),
+        "CLAUDE_CONFIG_DIR": _isolated_config_dir(),
     }
     env.update({k: v for k, v in overrides.items() if v != ""})
     return env
@@ -77,9 +173,13 @@ async def _run_prompt(
     max_retries: int = 5,
 ) -> tuple[list[str], dict]:
     sdk_env = _build_sdk_env()
+    plugin_entries = _discover_plugin_entries(plugins_dir)
+    extra_args: dict[str, str | None] = {}
+    if os.environ.get("CME_DEBUG"):
+        extra_args["debug"] = "api,hooks"
     options = ClaudeAgentOptions(
-        plugins=[{"type": "local", "path": str(plugins_dir)}],
-        allowed_tools=["Skill", "Read", "Glob", "Grep", "Bash"],
+        plugins=plugin_entries,
+        allowed_tools=["Skill", "Read", "Glob", "Grep"],
         permission_mode="bypassPermissions",
         system_prompt={
             "type": "preset",
@@ -91,14 +191,16 @@ async def _run_prompt(
                 "Never ask clarifying questions."
             ),
         },
-        setting_sources=["project"],
+        setting_sources=[],
         max_turns=test.max_turns,
         model=test.model,
         cwd=str(plugins_dir),
         env=sdk_env,
         stderr=lambda line: logger.warning("CLI[%s] %s", test.name, line),
-        extra_args={"debug": "api,hooks"} if os.environ.get("CME_DEBUG") else {},
+        extra_args=extra_args,
     )
+
+    debug = bool(os.environ.get("CME_DEBUG"))
 
     for attempt in range(max_retries + 1):
         try:
@@ -107,6 +209,8 @@ async def _run_prompt(
             pass_met = False
 
             async for message in query(prompt=prompt, options=options):
+                if debug:
+                    _debug_log_message(test.name, message)
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, ToolUseBlock) and block.name == "Skill":
