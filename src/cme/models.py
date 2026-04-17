@@ -37,7 +37,7 @@ class TestCase(BaseModel):
     expected_skill: str | None = None
     expected_skills: list[str] | None = None
     expected_skill_one_of: list[str] | None = None
-    max_turns: int = 5
+    max_turns: int | None = None
     model: str | None = None
 
 

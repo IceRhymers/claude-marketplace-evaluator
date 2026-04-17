@@ -52,6 +52,12 @@ def main() -> None:
     show_default=True,
     help="Max retries on rate limit errors.",
 )
+@click.option(
+    "--max-turns",
+    default=5,
+    show_default=True,
+    help="Max agent turns per routing eval.",
+)
 def routing(
     plugins_dir: str,
     coverage_threshold: float,
@@ -59,6 +65,7 @@ def routing(
     workers: int,
     timeout: int,
     max_retries: int,
+    max_turns: int,
 ) -> None:
     """Run routing evals: generate → coverage check → eval runner."""
     from .coverage import check_coverage
@@ -114,7 +121,15 @@ def routing(
         loop.set_exception_handler(_exc_handler)
         try:
             rc = loop.run_until_complete(
-                run_all(tests, plugins_path, workers, timeout, max_retries, threshold)
+                run_all(
+                    tests,
+                    plugins_path,
+                    workers,
+                    timeout,
+                    max_retries,
+                    threshold,
+                    max_turns,
+                )
             )
         finally:
             loop.close()

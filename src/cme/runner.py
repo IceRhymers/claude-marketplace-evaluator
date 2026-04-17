@@ -171,12 +171,14 @@ async def _run_prompt(
     test: TestCase,
     plugins_dir: Path,
     max_retries: int = 5,
+    max_turns: int = 5,
 ) -> tuple[list[str], dict]:
     sdk_env = _build_sdk_env()
     plugin_entries = _discover_plugin_entries(plugins_dir)
     extra_args: dict[str, str | None] = {}
     if os.environ.get("CME_DEBUG"):
         extra_args["debug"] = "api,hooks"
+    effective_turns = test.max_turns if test.max_turns is not None else max_turns
     options = ClaudeAgentOptions(
         plugins=plugin_entries,
         allowed_tools=["Skill", "Read", "Glob", "Grep"],
@@ -218,7 +220,7 @@ async def _run_prompt(
             ),
         },
         setting_sources=[],
-        max_turns=test.max_turns,
+        max_turns=effective_turns,
         model=test.model,
         cwd=str(plugins_dir.resolve()),
         env=sdk_env,
@@ -274,10 +276,11 @@ async def run_test(
     plugins_dir: Path,
     timeout: int = 30,
     max_retries: int = 5,
+    max_turns: int = 5,
 ) -> TestResult:
     try:
         skills_invoked, _ = await asyncio.wait_for(
-            _run_prompt(test.prompt, test, plugins_dir, max_retries),
+            _run_prompt(test.prompt, test, plugins_dir, max_retries, max_turns),
             timeout=timeout,
         )
     except TimeoutError:
@@ -325,6 +328,7 @@ async def run_all(
     timeout: int = 30,
     max_retries: int = 5,
     threshold: float = 95.0,
+    max_turns: int = 5,
 ) -> int:
     """Run all tests, print summary, return exit code."""
     _configure_debug_logging()
@@ -333,7 +337,7 @@ async def run_all(
 
     async def bounded(test: TestCase) -> TestResult:
         async with semaphore:
-            return await run_test(test, plugins_dir, timeout, max_retries)
+            return await run_test(test, plugins_dir, timeout, max_retries, max_turns)
 
     results = await asyncio.gather(*[bounded(t) for t in tests], return_exceptions=True)
 
