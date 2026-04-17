@@ -20,8 +20,7 @@ def test_routing_no_default_plugins() -> None:
     assert result.exit_code != 0
 
 
-def test_overlap_stub() -> None:
+def test_overlap_no_default_plugins() -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["overlap"])
-    assert result.exit_code == 0
-    assert "not implemented" in result.output
+    assert result.exit_code == 1

@@ -119,6 +119,53 @@ def routing(
 
 
 @main.command()
-def overlap() -> None:
-    """Run semantic overlap detection across marketplace skills."""
-    click.echo("not implemented")
+@click.option(
+    "--plugins-dir",
+    default="plugins/",
+    show_default=True,
+    help="Path to plugins directory.",
+)
+@click.option(
+    "--output",
+    default="overlap-report.json",
+    show_default=True,
+    help="Output JSON report path.",
+)
+@click.option(
+    "--model",
+    default=None,
+    help="Model to use for analysis (overrides ANTHROPIC_MODEL env var).",
+)
+def overlap(plugins_dir: str, output: str, model: str | None) -> None:
+    """Detect semantic skill collisions across marketplace plugins."""
+    from .overlap import detect_overlap
+
+    plugins_path = Path(plugins_dir)
+    output_path = Path(output)
+
+    if not plugins_path.is_dir():
+        click.secho(f"ERROR: plugins dir not found: {plugins_path}", fg="red", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"Analyzing skills in {plugins_path}...")
+    report = detect_overlap(plugins_path, output_path, model=model)
+
+    click.echo(f"\nReport written to: {output_path}")
+    click.echo(f"Skills analyzed: {report.total_skills_analyzed}")
+    click.echo(f"Collisions found: {report.total_collisions}")
+
+    if report.collisions:
+        by_severity: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+        for c in report.collisions:
+            by_severity[c.severity] = by_severity.get(c.severity, 0) + 1
+        for sev, count in by_severity.items():
+            if count:
+                click.echo(f"  {sev}: {count}")
+        click.secho(
+            "\nFAILED: collisions detected — resolve before merging.",
+            fg="red",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    click.echo("\nPASSED: no collisions detected.")
