@@ -1,0 +1,7 @@
+[
+  { "query": "Format the source code in this project", "should_trigger": true },
+  { "query": "Run prettier on the changed files", "should_trigger": true },
+  { "query": "Auto-fix the formatting issues", "should_trigger": true },
+  { "query": "Lint the codebase for violations", "should_trigger": false },
+  { "query": "Deploy the service to staging", "should_trigger": false }
+]

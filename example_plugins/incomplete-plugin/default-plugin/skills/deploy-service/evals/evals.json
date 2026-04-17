@@ -1,0 +1,10 @@
+[
+  { "query": "Deploy the application to staging", "should_trigger": true },
+  { "query": "Ship this to production", "should_trigger": true },
+  {
+    "query": "Push the latest build to the dev environment",
+    "should_trigger": true
+  },
+  { "query": "Roll back the last deployment", "should_trigger": false },
+  { "query": "Run the unit tests", "should_trigger": false }
+]

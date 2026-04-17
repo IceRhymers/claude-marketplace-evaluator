@@ -55,3 +55,7 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (require fixture files)",
+]
+addopts = "-m 'not integration'"

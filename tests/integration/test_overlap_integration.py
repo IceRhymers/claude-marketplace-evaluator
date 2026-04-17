@@ -1,0 +1,156 @@
+"""Integration tests for cme overlap against example_plugins/ fixtures.
+
+The LLM call is controlled by CME_SKIP_LLM=1 env var (returns empty collisions)
+for fast, API-key-free runs in standard CI. Unset it for live LLM testing.
+
+Run with: make test-integration
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+from click.testing import CliRunner
+
+from cme.cli import main
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+EXAMPLE_PLUGINS = REPO_ROOT / "example_plugins"
+
+
+def _mock_no_collisions() -> MagicMock:
+    block = MagicMock()
+    block.type = "tool_use"
+    block.name = "report_collisions"
+    block.input = {"collisions": []}
+    response = MagicMock()
+    response.content = [block]
+    client = MagicMock()
+    client.messages.create.return_value = response
+    return client
+
+
+def _mock_with_collision() -> MagicMock:
+    block = MagicMock()
+    block.type = "tool_use"
+    block.name = "report_collisions"
+    block.input = {
+        "collisions": [
+            {
+                "skill_a": "collision-plugin/skills/create-pr",
+                "skill_b": "collision-plugin/skills/submit-pr",
+                "overlapping_triggers": ["Create a pull request", "Submit a PR"],
+                "description_excerpts": [
+                    "Create a new GitHub pull request",
+                    "Submit a pull request on GitHub",
+                ],
+                "severity": "high",
+            }
+        ]
+    }
+    response = MagicMock()
+    response.content = [block]
+    client = MagicMock()
+    client.messages.create.return_value = response
+    return client
+
+
+@pytest.mark.integration
+class TestOverlapIntegration:
+    def test_dev_tools_no_collisions(self, tmp_path: Path) -> None:
+        """dev-tools has 3 distinct skills — no collisions expected."""
+        output = tmp_path / "report.json"
+        with patch(
+            "cme.overlap.anthropic.Anthropic", return_value=_mock_no_collisions()
+        ):
+            runner = CliRunner()
+            result = runner.invoke(
+                main,
+                [
+                    "overlap",
+                    "--plugins-dir",
+                    str(EXAMPLE_PLUGINS / "dev-tools"),
+                    "--output",
+                    str(output),
+                ],
+            )
+        assert result.exit_code == 0, result.output
+        assert "PASSED" in result.output
+        data = json.loads(output.read_text())
+        assert data["total_collisions"] == 0
+
+    def test_collision_plugin_detected(self, tmp_path: Path) -> None:
+        """collision-plugin has create-pr and submit-pr — should detect collision."""
+        output = tmp_path / "report.json"
+        with patch(
+            "cme.overlap.anthropic.Anthropic", return_value=_mock_with_collision()
+        ):
+            runner = CliRunner()
+            result = runner.invoke(
+                main,
+                [
+                    "overlap",
+                    "--plugins-dir",
+                    str(EXAMPLE_PLUGINS / "collision-plugin"),
+                    "--output",
+                    str(output),
+                ],
+            )
+        assert result.exit_code == 1
+        assert "FAILED" in result.output
+        data = json.loads(output.read_text())
+        assert data["total_collisions"] == 1
+        collision = data["collisions"][0]
+        assert (
+            "create-pr" in collision["skill_a"] or "create-pr" in collision["skill_b"]
+        )
+        assert collision["severity"] == "high"
+
+    def test_overlap_report_json_schema(self, tmp_path: Path) -> None:
+        """Verify JSON report has all required top-level fields."""
+        output = tmp_path / "report.json"
+        with patch(
+            "cme.overlap.anthropic.Anthropic", return_value=_mock_no_collisions()
+        ):
+            runner = CliRunner()
+            runner.invoke(
+                main,
+                [
+                    "overlap",
+                    "--plugins-dir",
+                    str(EXAMPLE_PLUGINS / "dev-tools"),
+                    "--output",
+                    str(output),
+                ],
+            )
+        data = json.loads(output.read_text())
+        assert "timestamp" in data
+        assert "model_used" in data
+        assert "total_skills_analyzed" in data
+        assert "total_collisions" in data
+        assert "collisions" in data
+        assert data["total_skills_analyzed"] == 3  # dev-tools has 3 skills
+
+    def test_overlap_counts_all_skills(self, tmp_path: Path) -> None:
+        """Skills without evals are still counted in total_skills_analyzed."""
+        output = tmp_path / "report.json"
+        with patch(
+            "cme.overlap.anthropic.Anthropic", return_value=_mock_no_collisions()
+        ):
+            runner = CliRunner()
+            runner.invoke(
+                main,
+                [
+                    "overlap",
+                    "--plugins-dir",
+                    str(EXAMPLE_PLUGINS / "incomplete-plugin"),
+                    "--output",
+                    str(output),
+                ],
+            )
+        data = json.loads(output.read_text())
+        # incomplete-plugin has 4 skills — all counted, not just those with evals
+        assert data["total_skills_analyzed"] == 4
