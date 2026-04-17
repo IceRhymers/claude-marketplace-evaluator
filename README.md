@@ -133,15 +133,30 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 cme routing --plugins-dir plugins/
 ```
 
-### LLM proxy (Databricks AI Gateway, etc.)
+### Databricks AI Gateway
 
-For routing through Databricks AI Gateway or other LLM proxies:
+For routing through Databricks AI Gateway, map your workspace secrets to the standard Anthropic SDK env vars:
 
 ```bash
-export ANTHROPIC_AUTH_TOKEN="dapi..."
-export ANTHROPIC_BASE_URL="https://your-workspace.databricks.com/serving-endpoints/your-endpoint/invocations"
-export ANTHROPIC_MODEL="databricks-claude-sonnet"
+export ANTHROPIC_AUTH_TOKEN="<DATABRICKS_SP_TOKEN>"           # service principal PAT
+export ANTHROPIC_BASE_URL="<DATABRICKS_AI_GATEWAY_URL>"       # AI Gateway endpoint URL
+export ANTHROPIC_MODEL="<DATABRICKS_AI_GATEWAY_MODEL>"        # endpoint model name
+export ANTHROPIC_CUSTOM_HEADERS="x-databricks-use-coding-agent-mode: true"
+export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS="1"
+export CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=""
 cme routing --plugins-dir plugins/
+```
+
+In GitHub Actions, these map directly from repository secrets:
+
+```yaml
+env:
+  ANTHROPIC_AUTH_TOKEN: ${{ secrets.DATABRICKS_SP_TOKEN }}
+  ANTHROPIC_BASE_URL: ${{ secrets.DATABRICKS_AI_GATEWAY_URL }}
+  ANTHROPIC_MODEL: ${{ secrets.DATABRICKS_AI_GATEWAY_MODEL }}
+  ANTHROPIC_CUSTOM_HEADERS: "x-databricks-use-coding-agent-mode: true"
+  CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1"
+  CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING: ""
 ```
 
 ## CI/CD Integration
