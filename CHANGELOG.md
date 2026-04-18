@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.2.1...v0.3.0) (2026-04-18)
+
+
+### Features
+
+* use .claude-plugin/plugin.json markers for plugin discovery ([3c84be3](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/3c84be3b53f380e74d75699f2d89abece183127e))
+* use .claude-plugin/plugin.json markers for plugin discovery ([08ea51e](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/08ea51e653aa5297829cd58df69ff7aa1eb7daad)), closes [#23](https://github.com/IceRhymers/claude-marketplace-evaluator/issues/23)
+
 ## [0.2.1](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.2.0...v0.2.1) (2026-04-17)
 
 
