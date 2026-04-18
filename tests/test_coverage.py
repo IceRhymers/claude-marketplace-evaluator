@@ -10,6 +10,15 @@ import pytest
 from cme.coverage import check_coverage
 
 
+def _make_plugin_marker(base: Path, plugin: str) -> None:
+    """Create .claude-plugin/plugin.json marker for a plugin."""
+    marker_dir = base / plugin / ".claude-plugin"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker = marker_dir / "plugin.json"
+    if not marker.exists():
+        marker.write_text(json.dumps({"name": plugin, "skills": "./skills/"}))
+
+
 def _make_skill(
     base: Path,
     plugin: str,
@@ -18,6 +27,7 @@ def _make_skill(
     with_evals: bool = True,
     malformed: bool = False,
 ) -> None:
+    _make_plugin_marker(base, plugin)
     skill_dir = base / plugin / "skills" / skill
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(f"---\nname: {skill}\n---")
@@ -56,6 +66,8 @@ def test_malformed_evals_flagged(tmp_path: Path) -> None:
 
 
 def test_zero_skills_is_100pct(tmp_path: Path) -> None:
+    # Plugin with marker but no skills
+    _make_plugin_marker(tmp_path, "empty-plugin")
     report, rc = check_coverage(tmp_path, 100.0)
     assert report.coverage_pct == 100.0
     assert rc == 0
