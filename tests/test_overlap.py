@@ -10,6 +10,15 @@ from cme.models import CollisionPair
 from cme.overlap import _build_prompt, _collect_skills, detect_overlap
 
 
+def _make_plugin_marker(base: Path, plugin: str) -> None:
+    """Create .claude-plugin/plugin.json marker for a plugin."""
+    marker_dir = base / plugin / ".claude-plugin"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker = marker_dir / "plugin.json"
+    if not marker.exists():
+        marker.write_text(json.dumps({"name": plugin, "skills": "./skills/"}))
+
+
 def _make_skill(
     base: Path,
     plugin: str,
@@ -17,6 +26,7 @@ def _make_skill(
     description: str = "A skill that does things.",
     triggers: list[str] | None = None,
 ) -> None:
+    _make_plugin_marker(base, plugin)
     skill_dir = base / plugin / "skills" / skill
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
@@ -30,6 +40,8 @@ def _make_skill(
 
 
 def test_collect_skills_empty(tmp_path: Path) -> None:
+    # Plugin with marker but no skills
+    _make_plugin_marker(tmp_path, "empty-plugin")
     skills = _collect_skills(tmp_path)
     assert skills == []
 
@@ -76,6 +88,7 @@ def test_build_prompt_includes_skill_data(tmp_path: Path) -> None:
 
 def test_detect_overlap_no_skills(tmp_path: Path) -> None:
     """With no skills, skip LLM call and return empty report."""
+    _make_plugin_marker(tmp_path, "empty-plugin")
     output = tmp_path / "report.json"
     report = detect_overlap(tmp_path, output)
     assert report.total_skills_analyzed == 0
@@ -154,6 +167,7 @@ def test_detect_overlap_no_collisions(tmp_path: Path) -> None:
 
 def test_detect_overlap_report_json_structure(tmp_path: Path) -> None:
     """Verify JSON output has required top-level fields."""
+    _make_plugin_marker(tmp_path, "empty-plugin")
     output = tmp_path / "report.json"
     detect_overlap(tmp_path, output)
     data = json.loads(output.read_text())

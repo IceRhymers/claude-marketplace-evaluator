@@ -139,22 +139,16 @@ def _check_pass(skills_invoked: list[str], test: TestCase) -> bool:
 
 
 def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
-    """Register each inner plugin (dir containing a skills/ subdir) separately.
+    """Discover plugins via .claude-plugin/plugin.json markers.
 
-    Supports both a single-plugin layout (plugins_dir/skills/...) and a
-    marketplace layout (plugins_dir/<plugin-name>/skills/...).
-
-    Paths are resolved to absolute so the spawned CLI subprocess doesn't
-    double-resolve them against its own cwd.
+    Returns one SdkPluginConfig per discovered plugin, with resolved
+    absolute paths so the spawned CLI subprocess doesn't double-resolve
+    them against its own cwd.
     """
-    plugins_dir = plugins_dir.resolve()
-    if (plugins_dir / "skills").is_dir():
-        return [SdkPluginConfig(type="local", path=str(plugins_dir))]
-    return [
-        SdkPluginConfig(type="local", path=str(p))
-        for p in sorted(plugins_dir.iterdir())
-        if p.is_dir() and (p / "skills").is_dir()
-    ]
+    from .discover import discover_plugins
+
+    plugins = discover_plugins(plugins_dir)
+    return [SdkPluginConfig(type="local", path=str(p.root_dir)) for p in plugins]
 
 
 def _build_sdk_env() -> dict[str, str]:

@@ -10,13 +10,19 @@ from typing import Any
 
 import anthropic
 
+from .discover import discover_plugins
 from .models import CollisionPair, OverlapReport
 
 
 def _collect_skills(plugins_dir: Path) -> list[dict[str, Any]]:
     """Walk plugins dir and collect skill descriptions + triggers."""
+    plugins = discover_plugins(plugins_dir)
+    all_skill_mds: list[Path] = []
+    for plugin in plugins:
+        all_skill_mds.extend(sorted(plugin.skills_dir.glob("*/SKILL.md")))
+
     skills: list[dict[str, Any]] = []
-    for skill_md in sorted(plugins_dir.glob("*/skills/*/SKILL.md")):
+    for skill_md in all_skill_mds:
         skill_dir = skill_md.parent
         # relative path for display
         try:

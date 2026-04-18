@@ -5,14 +5,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .discover import discover_plugins
 from .generate import load_evals_file
 from .models import CoverageReport
 
 
 def check_coverage(plugins_dir: Path, threshold: float) -> tuple[CoverageReport, int]:
     """Walk plugins dir, check eval coverage. Returns (report, exit_code)."""
-    skill_dirs = sorted(plugins_dir.glob("*/skills/*/"))
-    skill_dirs = [d for d in skill_dirs if (d / "SKILL.md").exists()]
+    plugins = discover_plugins(plugins_dir)
+    skill_dirs: list[Path] = []
+    for plugin in plugins:
+        skill_dirs.extend(
+            sorted(d for d in plugin.skills_dir.glob("*/") if (d / "SKILL.md").exists())
+        )
 
     missing: list[str] = []
     malformed: list[str] = []

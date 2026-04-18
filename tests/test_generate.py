@@ -53,8 +53,14 @@ def test_load_evals_file_not_array(tmp_path: Path) -> None:
 
 
 def test_generate_creates_yaml(tmp_path: Path) -> None:
-    # Create a fake plugin/skill/evals structure
-    evals_dir = tmp_path / "plugins" / "my-plugin" / "skills" / "my-skill" / "evals"
+    # Create a fake plugin/skill/evals structure with plugin.json marker
+    plugin_dir = tmp_path / "plugins" / "my-plugin"
+    marker_dir = plugin_dir / ".claude-plugin"
+    marker_dir.mkdir(parents=True)
+    (marker_dir / "plugin.json").write_text(
+        json.dumps({"name": "my-plugin", "skills": "./skills/"})
+    )
+    evals_dir = plugin_dir / "skills" / "my-skill" / "evals"
     evals_dir.mkdir(parents=True)
     (evals_dir / "evals.json").write_text(
         json.dumps(
@@ -84,7 +90,13 @@ def test_generate_missing_plugins_dir(tmp_path: Path) -> None:
 
 
 def test_generate_bad_evals_json(tmp_path: Path) -> None:
-    evals_dir = tmp_path / "plugins" / "p" / "skills" / "s" / "evals"
+    plugin_dir = tmp_path / "plugins" / "p"
+    marker_dir = plugin_dir / ".claude-plugin"
+    marker_dir.mkdir(parents=True)
+    (marker_dir / "plugin.json").write_text(
+        json.dumps({"name": "p", "skills": "./skills/"})
+    )
+    evals_dir = plugin_dir / "skills" / "s" / "evals"
     evals_dir.mkdir(parents=True)
     (evals_dir / "evals.json").write_text("not json")
     rc = generate(tmp_path / "plugins", tmp_path / "out")
