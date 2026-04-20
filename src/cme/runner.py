@@ -272,7 +272,9 @@ async def run_test(
 ) -> TestResult:
     try:
         skills_invoked, _ = await asyncio.wait_for(
-            _run_prompt(test.prompt, test, plugin_entries, max_retries, max_turns, cwd=cwd),
+            _run_prompt(
+                test.prompt, test, plugin_entries, max_retries, max_turns, cwd=cwd
+            ),
             timeout=timeout,
         )
     except TimeoutError:
@@ -330,7 +332,9 @@ async def run_all(
 
     async def bounded(test: TestCase) -> TestResult:
         async with semaphore:
-            return await run_test(test, plugin_entries, timeout, max_retries, max_turns, cwd=cwd)
+            return await run_test(
+                test, plugin_entries, timeout, max_retries, max_turns, cwd=cwd
+            )
 
     results = await asyncio.gather(*[bounded(t) for t in tests], return_exceptions=True)
 
