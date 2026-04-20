@@ -14,7 +14,9 @@ from .discover import PluginInfo, discover_plugins
 from .models import CollisionPair, OverlapReport
 
 
-def _collect_skills(plugins_dir: Path, plugins: list[PluginInfo] | None = None) -> list[dict[str, Any]]:
+def _collect_skills(
+    plugins_dir: Path, plugins: list[PluginInfo] | None = None
+) -> list[dict[str, Any]]:
     """Walk plugins dir and collect skill descriptions + triggers."""
     if plugins is None:
         plugins = discover_plugins(plugins_dir)
