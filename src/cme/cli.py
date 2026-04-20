@@ -89,7 +89,11 @@ def routing(
         plugins = filter_plugins(all_plugins, plugin_patterns)
         if not plugins:
             patterns_str = ", ".join(plugin_patterns)
-            click.secho(f"ERROR: no plugins matched pattern(s): {patterns_str}", fg="red", err=True)
+            click.secho(
+                f"ERROR: no plugins matched pattern(s): {patterns_str}",
+                fg="red",
+                err=True,
+            )
             raise SystemExit(1)
         names = ", ".join(p.name for p in plugins)
         click.echo(f"Filtering to {len(plugins)}/{len(all_plugins)} plugins: {names}")
@@ -187,7 +191,9 @@ def routing(
     metavar="PATTERN",
     help="Glob filter on plugin name. Repeatable: --plugin 'git-*' --plugin 'slack-*'. OR semantics.",
 )
-def overlap(plugins_dir: str, output: str, model: str | None, plugin_patterns: tuple[str, ...]) -> None:
+def overlap(
+    plugins_dir: str, output: str, model: str | None, plugin_patterns: tuple[str, ...]
+) -> None:
     """Detect semantic skill collisions across marketplace plugins."""
     from .discover import discover_plugins, filter_plugins
     from .overlap import detect_overlap
@@ -205,7 +211,11 @@ def overlap(plugins_dir: str, output: str, model: str | None, plugin_patterns: t
         plugins = filter_plugins(all_plugins, plugin_patterns)
         if not plugins:
             patterns_str = ", ".join(plugin_patterns)
-            click.secho(f"ERROR: no plugins matched pattern(s): {patterns_str}", fg="red", err=True)
+            click.secho(
+                f"ERROR: no plugins matched pattern(s): {patterns_str}",
+                fg="red",
+                err=True,
+            )
             raise SystemExit(1)
         names = ", ".join(p.name for p in plugins)
         click.echo(f"Filtering to {len(plugins)}/{len(all_plugins)} plugins: {names}")
