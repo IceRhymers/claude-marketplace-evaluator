@@ -17,6 +17,12 @@ def _make_skill(base: Path, plugin: str, skill: str) -> None:
     (skill_dir / "SKILL.md").write_text(
         f"---\nname: {skill}\n---\nDoes {skill} things."
     )
+    # Ensure .claude-plugin/plugin.json marker exists for discover_plugins
+    marker_dir = base / plugin / ".claude-plugin"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker_file = marker_dir / "plugin.json"
+    if not marker_file.exists():
+        marker_file.write_text(f'{{"name": "{plugin}", "skills": "./skills/"}}')
 
 
 def test_overlap_missing_plugins_dir() -> None:
