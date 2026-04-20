@@ -5,14 +5,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .discover import discover_plugins
+from .discover import PluginInfo, discover_plugins
 from .generate import load_evals_file
 from .models import CoverageReport
 
 
-def check_coverage(plugins_dir: Path, threshold: float) -> tuple[CoverageReport, int]:
+def check_coverage(
+    plugins_dir: Path, threshold: float, plugins: list[PluginInfo] | None = None
+) -> tuple[CoverageReport, int]:
     """Walk plugins dir, check eval coverage. Returns (report, exit_code)."""
-    plugins = discover_plugins(plugins_dir)
+    if plugins is None:
+        plugins = discover_plugins(plugins_dir)
     skill_dirs: list[Path] = []
     for plugin in plugins:
         skill_dirs.extend(

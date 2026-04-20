@@ -138,16 +138,13 @@ def _check_pass(skills_invoked: list[str], test: TestCase) -> bool:
     return False
 
 
-def _discover_plugin_entries(plugins_dir: Path) -> list[SdkPluginConfig]:
-    """Discover plugins via .claude-plugin/plugin.json markers.
+def _discover_plugin_entries(plugins: list) -> list[SdkPluginConfig]:
+    """Convert PluginInfo list to SdkPluginConfig entries.
 
-    Returns one SdkPluginConfig per discovered plugin, with resolved
+    Returns one SdkPluginConfig per plugin, with resolved
     absolute paths so the spawned CLI subprocess doesn't double-resolve
     them against its own cwd.
     """
-    from .discover import discover_plugins
-
-    plugins = discover_plugins(plugins_dir)
     return [SdkPluginConfig(type="local", path=str(p.root_dir)) for p in plugins]
 
 
@@ -163,12 +160,12 @@ def _build_sdk_env() -> dict[str, str]:
 async def _run_prompt(
     prompt: str,
     test: TestCase,
-    plugins_dir: Path,
+    plugin_entries: list[SdkPluginConfig],
     max_retries: int = 5,
     max_turns: int = 5,
+    cwd: str | None = None,
 ) -> tuple[list[str], dict]:
     sdk_env = _build_sdk_env()
-    plugin_entries = _discover_plugin_entries(plugins_dir)
     extra_args: dict[str, str | None] = {}
     if os.environ.get("CME_DEBUG"):
         extra_args["debug"] = "api,hooks"
@@ -216,7 +213,7 @@ async def _run_prompt(
         setting_sources=[],
         max_turns=effective_turns,
         model=test.model,
-        cwd=str(plugins_dir.resolve()),
+        cwd=cwd or os.getcwd(),
         env=sdk_env,
         stderr=lambda line: logger.warning("CLI[%s] %s", test.name, line),
         extra_args=extra_args,
@@ -267,14 +264,17 @@ async def _run_prompt(
 
 async def run_test(
     test: TestCase,
-    plugins_dir: Path,
+    plugin_entries: list[SdkPluginConfig],
     timeout: int = 30,
     max_retries: int = 5,
     max_turns: int = 5,
+    cwd: str | None = None,
 ) -> TestResult:
     try:
         skills_invoked, _ = await asyncio.wait_for(
-            _run_prompt(test.prompt, test, plugins_dir, max_retries, max_turns),
+            _run_prompt(
+                test.prompt, test, plugin_entries, max_retries, max_turns, cwd=cwd
+            ),
             timeout=timeout,
         )
     except TimeoutError:
@@ -317,12 +317,13 @@ async def run_test(
 
 async def run_all(
     tests: list[TestCase],
-    plugins_dir: Path,
+    plugin_entries: list[SdkPluginConfig],
     workers: int = 4,
     timeout: int = 30,
     max_retries: int = 5,
     threshold: float = 95.0,
     max_turns: int = 5,
+    cwd: str | None = None,
 ) -> int:
     """Run all tests, print summary, return exit code."""
     _configure_debug_logging()
@@ -331,7 +332,9 @@ async def run_all(
 
     async def bounded(test: TestCase) -> TestResult:
         async with semaphore:
-            return await run_test(test, plugins_dir, timeout, max_retries, max_turns)
+            return await run_test(
+                test, plugin_entries, timeout, max_retries, max_turns, cwd=cwd
+            )
 
     results = await asyncio.gather(*[bounded(t) for t in tests], return_exceptions=True)
 

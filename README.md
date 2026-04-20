@@ -41,6 +41,7 @@ cme routing --plugins-dir plugins/
 | `--timeout` | `30` | Per-test timeout in seconds |
 | `--max-retries` | `1` | Max retries on rate limit errors (exponential backoff) |
 | `--max-turns` | `5` | Max agent turns per routing eval. Individual test cases can override this with a `max_turns` field in `evals.json` |
+| `--plugin` | | Glob filter on plugin name. Repeatable with OR semantics |
 
 Exit codes: `0` = all checks pass, `1` = coverage or routing threshold not met.
 
@@ -57,6 +58,7 @@ cme overlap --plugins-dir plugins/ --output overlap-report.json
 | `--plugins-dir` | `plugins/` | Path to the plugins directory |
 | `--output` | `overlap-report.json` | Output path for the JSON collision report |
 | `--model` | `claude-sonnet-4-5` | Model for analysis (overrides `ANTHROPIC_MODEL` env var) |
+| `--plugin` | | Glob filter on plugin name. Repeatable with OR semantics |
 
 Exit codes: `0` = no collisions, `1` = collisions detected.
 
@@ -322,6 +324,10 @@ cme overlap --plugins-dir ./plugins
 
 # Increase parallelism for large marketplaces
 cme routing --plugins-dir ./plugins -j 8 --timeout 120
+
+# Run only plugins matching a pattern
+cme routing --plugins-dir ./plugins --plugin "git-*"
+cme routing --plugins-dir ./plugins --plugin "git-*" --plugin "slack-*"
 
 # Increase max agent turns for complex multi-step skills
 cme routing --plugins-dir ./plugins --max-turns 10

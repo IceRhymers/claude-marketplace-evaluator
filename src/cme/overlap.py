@@ -10,13 +10,16 @@ from typing import Any
 
 import anthropic
 
-from .discover import discover_plugins
+from .discover import PluginInfo, discover_plugins
 from .models import CollisionPair, OverlapReport
 
 
-def _collect_skills(plugins_dir: Path) -> list[dict[str, Any]]:
+def _collect_skills(
+    plugins_dir: Path, plugins: list[PluginInfo] | None = None
+) -> list[dict[str, Any]]:
     """Walk plugins dir and collect skill descriptions + triggers."""
-    plugins = discover_plugins(plugins_dir)
+    if plugins is None:
+        plugins = discover_plugins(plugins_dir)
     all_skill_mds: list[Path] = []
     for plugin in plugins:
         all_skill_mds.extend(sorted(plugin.skills_dir.glob("*/SKILL.md")))
@@ -147,9 +150,10 @@ def detect_overlap(
     plugins_dir: Path,
     output_path: Path,
     model: str | None = None,
+    plugins: list[PluginInfo] | None = None,
 ) -> OverlapReport:
     """Run overlap detection and write JSON report. Returns the report."""
-    skills = _collect_skills(plugins_dir)
+    skills = _collect_skills(plugins_dir, plugins=plugins)
 
     client = _build_client()
 

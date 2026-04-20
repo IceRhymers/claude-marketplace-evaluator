@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from .discover import discover_plugins
+from .discover import PluginInfo, discover_plugins
 from .models import EvalsFile
 
 
@@ -55,7 +55,9 @@ def format_yaml_test_cases(test_cases: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def generate(plugins_dir: Path, out_dir: Path) -> int:
+def generate(
+    plugins_dir: Path, out_dir: Path, plugins: list[PluginInfo] | None = None
+) -> int:
     """Walk plugins dir, generate routing YAMLs. Returns exit code (0=ok, 1=error)."""
     if not plugins_dir.is_dir():
         print(f"ERROR: plugins dir not found: {plugins_dir}", file=sys.stderr)
@@ -63,7 +65,8 @@ def generate(plugins_dir: Path, out_dir: Path) -> int:
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    plugins = discover_plugins(plugins_dir)
+    if plugins is None:
+        plugins = discover_plugins(plugins_dir)
     entries: list[tuple[str, str, Path]] = []
     for plugin in plugins:
         for evals_path in sorted(plugin.skills_dir.glob("*/evals/evals.json")):

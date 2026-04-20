@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import sys
 from dataclasses import dataclass
@@ -48,3 +49,12 @@ def discover_plugins(root: Path) -> list[PluginInfo]:
             PluginInfo(name=name, root_dir=plugin_root, skills_dir=skills_dir)
         )
     return plugins
+
+
+def filter_plugins(
+    plugins: list[PluginInfo], patterns: tuple[str, ...]
+) -> list[PluginInfo]:
+    """Filter plugins by glob patterns against plugin name. OR semantics."""
+    if not patterns:
+        return plugins
+    return [p for p in plugins if any(fnmatch.fnmatch(p.name, pat) for pat in patterns)]
