@@ -58,6 +58,13 @@ def main() -> None:
     show_default=True,
     help="Max agent turns per routing eval.",
 )
+@click.option(
+    "--plugin",
+    "plugin_patterns",
+    multiple=True,
+    metavar="PATTERN",
+    help="Glob filter on plugin name. Repeatable: --plugin 'git-*' --plugin 'slack-*'. OR semantics.",
+)
 def routing(
     plugins_dir: str,
     coverage_threshold: float,
@@ -66,26 +73,43 @@ def routing(
     timeout: int,
     max_retries: int,
     max_turns: int,
+    plugin_patterns: tuple[str, ...],
 ) -> None:
     """Run routing evals: generate → coverage check → eval runner."""
     from .coverage import check_coverage
+    from .discover import discover_plugins, filter_plugins
     from .generate import generate
-    from .runner import load_test_cases, run_all
+    from .runner import _discover_plugin_entries, load_test_cases, run_all
 
     plugins_path = Path(plugins_dir)
+
+    all_plugins = discover_plugins(plugins_path)
+
+    if plugin_patterns:
+        plugins = filter_plugins(all_plugins, plugin_patterns)
+        if not plugins:
+            patterns_str = ", ".join(plugin_patterns)
+            click.secho(f"ERROR: no plugins matched pattern(s): {patterns_str}", fg="red", err=True)
+            raise SystemExit(1)
+        names = ", ".join(p.name for p in plugins)
+        click.echo(f"Filtering to {len(plugins)}/{len(all_plugins)} plugins: {names}")
+    else:
+        plugins = all_plugins
+
+    plugin_entries = _discover_plugin_entries(plugins)
 
     with tempfile.TemporaryDirectory() as tmp:
         out_dir = Path(tmp)
 
         # Step 1: Generate
         click.echo("\n[1/3] Generating routing test cases...")
-        rc = generate(plugins_path, out_dir)
+        rc = generate(plugins_path, out_dir, plugins=plugins)
         if rc != 0:
             raise SystemExit(1)
 
         # Step 2: Coverage check
         click.echo("\n[2/3] Checking eval coverage...")
-        _, cov_rc = check_coverage(plugins_path, coverage_threshold)
+        _, cov_rc = check_coverage(plugins_path, coverage_threshold, plugins=plugins)
         if cov_rc != 0:
             raise SystemExit(1)
 
@@ -123,12 +147,13 @@ def routing(
             rc = loop.run_until_complete(
                 run_all(
                     tests,
-                    plugins_path,
+                    plugin_entries,
                     workers,
                     timeout,
                     max_retries,
                     threshold,
                     max_turns,
+                    cwd=str(plugins_path.resolve()),
                 )
             )
         finally:
@@ -155,8 +180,16 @@ def routing(
     default=None,
     help="Model to use for analysis (overrides ANTHROPIC_MODEL env var).",
 )
-def overlap(plugins_dir: str, output: str, model: str | None) -> None:
+@click.option(
+    "--plugin",
+    "plugin_patterns",
+    multiple=True,
+    metavar="PATTERN",
+    help="Glob filter on plugin name. Repeatable: --plugin 'git-*' --plugin 'slack-*'. OR semantics.",
+)
+def overlap(plugins_dir: str, output: str, model: str | None, plugin_patterns: tuple[str, ...]) -> None:
     """Detect semantic skill collisions across marketplace plugins."""
+    from .discover import discover_plugins, filter_plugins
     from .overlap import detect_overlap
 
     plugins_path = Path(plugins_dir)
@@ -166,8 +199,21 @@ def overlap(plugins_dir: str, output: str, model: str | None) -> None:
         click.secho(f"ERROR: plugins dir not found: {plugins_path}", fg="red", err=True)
         raise SystemExit(1)
 
+    all_plugins = discover_plugins(plugins_path)
+
+    if plugin_patterns:
+        plugins = filter_plugins(all_plugins, plugin_patterns)
+        if not plugins:
+            patterns_str = ", ".join(plugin_patterns)
+            click.secho(f"ERROR: no plugins matched pattern(s): {patterns_str}", fg="red", err=True)
+            raise SystemExit(1)
+        names = ", ".join(p.name for p in plugins)
+        click.echo(f"Filtering to {len(plugins)}/{len(all_plugins)} plugins: {names}")
+    else:
+        plugins = all_plugins
+
     click.echo(f"Analyzing skills in {plugins_path}...")
-    report = detect_overlap(plugins_path, output_path, model=model)
+    report = detect_overlap(plugins_path, output_path, model=model, plugins=plugins)
 
     click.echo(f"\nReport written to: {output_path}")
     click.echo(f"Skills analyzed: {report.total_skills_analyzed}")
