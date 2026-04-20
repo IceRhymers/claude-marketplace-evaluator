@@ -51,7 +51,9 @@ def discover_plugins(root: Path) -> list[PluginInfo]:
     return plugins
 
 
-def filter_plugins(plugins: list[PluginInfo], patterns: tuple[str, ...]) -> list[PluginInfo]:
+def filter_plugins(
+    plugins: list[PluginInfo], patterns: tuple[str, ...]
+) -> list[PluginInfo]:
     """Filter plugins by glob patterns against plugin name. OR semantics."""
     if not patterns:
         return plugins
