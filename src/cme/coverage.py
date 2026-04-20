@@ -10,7 +10,9 @@ from .generate import load_evals_file
 from .models import CoverageReport
 
 
-def check_coverage(plugins_dir: Path, threshold: float, plugins: list[PluginInfo] | None = None) -> tuple[CoverageReport, int]:
+def check_coverage(
+    plugins_dir: Path, threshold: float, plugins: list[PluginInfo] | None = None
+) -> tuple[CoverageReport, int]:
     """Walk plugins dir, check eval coverage. Returns (report, exit_code)."""
     if plugins is None:
         plugins = discover_plugins(plugins_dir)
