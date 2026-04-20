@@ -40,6 +40,7 @@ cme routing --plugins-dir plugins/
 | `-j` / `--workers` | `4` | Parallel workers for the eval runner |
 | `--timeout` | `30` | Per-test timeout in seconds |
 | `--max-retries` | `1` | Max retries on rate limit errors (exponential backoff) |
+| `--max-turns` | `5` | Max agent turns per routing eval. Individual test cases can override this with a `max_turns` field in `evals.json` |
 
 Exit codes: `0` = all checks pass, `1` = coverage or routing threshold not met.
 
@@ -321,6 +322,9 @@ cme overlap --plugins-dir ./plugins
 
 # Increase parallelism for large marketplaces
 cme routing --plugins-dir ./plugins -j 8 --timeout 120
+
+# Increase max agent turns for complex multi-step skills
+cme routing --plugins-dir ./plugins --max-turns 10
 
 # Debug mode (verbose Agent SDK logging)
 CME_DEBUG=1 cme routing --plugins-dir ./plugins
