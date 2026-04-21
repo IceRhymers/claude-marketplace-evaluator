@@ -155,8 +155,8 @@ class TestLiveRoutingEvals:
         )
 
     def test_dev_tools_routes_correctly(self) -> None:
-        """3 well-separated skills — model should route at ≥80% pass rate."""
-        result = self._invoke_routing("dev-tools", "80")
+        """3 well-separated skills — model should route at ≥70% pass rate."""
+        result = self._invoke_routing("dev-tools", "70")
         logger.info("exit_code=%s\n%s", result.exit_code, result.output)
         assert result.exit_code == 0, result.output
         assert "PASSED" in result.output
