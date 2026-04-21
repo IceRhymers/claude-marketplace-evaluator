@@ -297,7 +297,10 @@ def detect_overlap(
                     batch_findings = _call_llm(client, model_used, prompt)
                     # Deduplicate by sorted pair
                     for f in batch_findings:
-                        pair: tuple[str, str] = (min(f.skill_a, f.skill_b), max(f.skill_a, f.skill_b))
+                        pair: tuple[str, str] = (
+                            min(f.skill_a, f.skill_b),
+                            max(f.skill_a, f.skill_b),
+                        )
                         if pair not in seen_pairs:
                             seen_pairs.add(pair)
                             all_findings.append(f)
