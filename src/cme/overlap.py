@@ -100,7 +100,11 @@ def _collect_skill_cards(
 
 
 def _build_client() -> anthropic.Anthropic:
-    """Build Anthropic client (supports Databricks AI Gateway)."""
+    """Build Anthropic client (supports Databricks AI Gateway).
+
+    Requires ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN. CLAUDE_CODE_OAUTH_TOKEN
+    is not accepted here — /v1/messages rejects OAuth tokens.
+    """
     api_key: str | None = None
     base_url: str | None = None
     if token := os.environ.get("ANTHROPIC_AUTH_TOKEN"):
