@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.2.1...v0.3.0) (2026-04-21)
+
+
+### Features
+
+* add --plugin glob filter to routing and overlap commands ([#28](https://github.com/IceRhymers/claude-marketplace-evaluator/issues/28)) ([7ca0b26](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/7ca0b269a884d4d31a85190a03c3c618e623fad5))
+* redesign cme overlap to detect functional skill overlap ([#33](https://github.com/IceRhymers/claude-marketplace-evaluator/issues/33)) ([4914c55](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/4914c551e358f324ab1226a91f4bef02bd511701))
+* use .claude-plugin/plugin.json markers for plugin discovery ([3c84be3](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/3c84be3b53f380e74d75699f2d89abece183127e))
+* use .claude-plugin/plugin.json markers for plugin discovery ([08ea51e](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/08ea51e653aa5297829cd58df69ff7aa1eb7daad)), closes [#23](https://github.com/IceRhymers/claude-marketplace-evaluator/issues/23)
+
 ## [0.2.1](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.2.0...v0.2.1) (2026-04-17)
 
 
