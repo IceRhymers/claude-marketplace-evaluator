@@ -6,9 +6,7 @@ import asyncio
 import logging
 import os
 import random
-from pathlib import Path
 
-import yaml
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
@@ -373,12 +371,3 @@ async def run_all(
 
     print(f"\nPASSED ({pct:.1f}% >= {threshold}% threshold)")
     return 0
-
-
-def load_test_cases(yaml_path: Path) -> list[TestCase]:
-    with open(yaml_path) as f:
-        suite = yaml.safe_load(f)
-    tests = suite.get("tests") if suite else None
-    if not tests:
-        return []
-    return [TestCase(**t) for t in tests]

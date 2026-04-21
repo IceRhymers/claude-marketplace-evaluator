@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import tempfile
 from pathlib import Path
 
 import click
@@ -78,8 +77,8 @@ def routing(
     """Run routing evals: generate → coverage check → eval runner."""
     from .coverage import check_coverage
     from .discover import discover_plugins, filter_plugins
-    from .generate import generate
-    from .runner import _discover_plugin_entries, load_test_cases, run_all
+    from .generate import generate_test_cases
+    from .runner import _discover_plugin_entries, run_all
 
     plugins_path = Path(plugins_dir)
 
@@ -102,68 +101,55 @@ def routing(
 
     plugin_entries = _discover_plugin_entries(plugins)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        out_dir = Path(tmp)
+    # Step 1: Generate
+    click.echo("\n[1/3] Generating routing test cases...")
+    tests, rc = generate_test_cases(plugins_path, plugins=plugins)
+    if rc != 0:
+        raise SystemExit(1)
 
-        # Step 1: Generate
-        click.echo("\n[1/3] Generating routing test cases...")
-        rc = generate(plugins_path, out_dir, plugins=plugins)
-        if rc != 0:
-            raise SystemExit(1)
+    # Step 2: Coverage check
+    click.echo("\n[2/3] Checking eval coverage...")
+    _, cov_rc = check_coverage(plugins_path, coverage_threshold, plugins=plugins)
+    if cov_rc != 0:
+        raise SystemExit(1)
 
-        # Step 2: Coverage check
-        click.echo("\n[2/3] Checking eval coverage...")
-        _, cov_rc = check_coverage(plugins_path, coverage_threshold, plugins=plugins)
-        if cov_rc != 0:
-            raise SystemExit(1)
+    # Step 3: Eval runner
+    if threshold <= 0:
+        click.echo("\n[3/3] Skipping routing evals (--threshold 0).")
+        raise SystemExit(0)
 
-        # Step 3: Eval runner
-        if threshold <= 0:
-            click.echo("\n[3/3] Skipping routing evals (--threshold 0).")
-            raise SystemExit(0)
+    if not tests:
+        click.secho("No test cases generated — nothing to run.", fg="yellow", err=True)
+        raise SystemExit(0)
 
-        all_yaml = out_dir / "all.yaml"
-        if not all_yaml.exists():
-            click.secho(
-                "No test cases generated — nothing to run.", fg="yellow", err=True
+    click.echo("\n[3/3] Running routing evals...")
+
+    loop = asyncio.new_event_loop()
+
+    def _exc_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, RuntimeError) and "cancel scope" in str(exc):
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_exc_handler)
+    try:
+        rc = loop.run_until_complete(
+            run_all(
+                tests,
+                plugin_entries,
+                workers,
+                timeout,
+                max_retries,
+                threshold,
+                max_turns,
+                cwd=str(plugins_path.resolve()),
             )
-            raise SystemExit(0)
+        )
+    finally:
+        loop.close()
 
-        click.echo("\n[3/3] Running routing evals...")
-        tests = load_test_cases(all_yaml)
-
-        if not tests:
-            click.secho(
-                "No test cases generated — nothing to run.", fg="yellow", err=True
-            )
-            raise SystemExit(0)
-
-        loop = asyncio.new_event_loop()
-
-        def _exc_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
-            exc = context.get("exception")
-            if isinstance(exc, RuntimeError) and "cancel scope" in str(exc):
-                return
-            loop.default_exception_handler(context)
-
-        loop.set_exception_handler(_exc_handler)
-        try:
-            rc = loop.run_until_complete(
-                run_all(
-                    tests,
-                    plugin_entries,
-                    workers,
-                    timeout,
-                    max_retries,
-                    threshold,
-                    max_turns,
-                    cwd=str(plugins_path.resolve()),
-                )
-            )
-        finally:
-            loop.close()
-
-        raise SystemExit(rc)
+    raise SystemExit(rc)
 
 
 @main.command()

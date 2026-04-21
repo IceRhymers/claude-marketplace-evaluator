@@ -1,4 +1,4 @@
-"""Tests for routing YAML generation."""
+"""Tests for routing test-case generation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from cme.generate import derive_test_name, generate, load_evals_file, slugify_query
+from cme.generate import (
+    derive_test_name,
+    generate_test_cases,
+    load_evals_file,
+    slugify_query,
+)
 
 
 def test_slugify_query_basic() -> None:
@@ -52,7 +57,7 @@ def test_load_evals_file_not_array(tmp_path: Path) -> None:
         load_evals_file(p)
 
 
-def test_generate_creates_yaml(tmp_path: Path) -> None:
+def test_generate_returns_test_cases(tmp_path: Path) -> None:
     # Create a fake plugin/skill/evals structure with plugin.json marker
     plugin_dir = tmp_path / "plugins" / "my-plugin"
     marker_dir = plugin_dir / ".claude-plugin"
@@ -73,20 +78,18 @@ def test_generate_creates_yaml(tmp_path: Path) -> None:
     # Also create a SKILL.md
     (evals_dir.parent / "SKILL.md").write_text("---\nname: my-skill\n---")
 
-    out_dir = tmp_path / "out"
-    rc = generate(tmp_path / "plugins", out_dir)
+    cases, rc = generate_test_cases(tmp_path / "plugins")
     assert rc == 0
-    assert (out_dir / "all.yaml").exists()
-    assert (out_dir / "my-plugin.yaml").exists()
-    content = (out_dir / "all.yaml").read_text()
-    assert "my-skill" in content
-    assert "do the thing" in content
-    assert "don't do it" not in content  # negative entry excluded
+    assert len(cases) == 1
+    assert cases[0].expected_skill == "my-skill"
+    assert cases[0].prompt == "do the thing"
+    assert "my-skill" in cases[0].name
 
 
 def test_generate_missing_plugins_dir(tmp_path: Path) -> None:
-    rc = generate(tmp_path / "nonexistent", tmp_path / "out")
+    cases, rc = generate_test_cases(tmp_path / "nonexistent")
     assert rc == 1
+    assert cases == []
 
 
 def test_generate_bad_evals_json(tmp_path: Path) -> None:
@@ -99,5 +102,6 @@ def test_generate_bad_evals_json(tmp_path: Path) -> None:
     evals_dir = plugin_dir / "skills" / "s" / "evals"
     evals_dir.mkdir(parents=True)
     (evals_dir / "evals.json").write_text("not json")
-    rc = generate(tmp_path / "plugins", tmp_path / "out")
+    cases, rc = generate_test_cases(tmp_path / "plugins")
     assert rc == 1
+    assert cases == []
