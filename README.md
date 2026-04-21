@@ -1,6 +1,6 @@
 # claude-marketplace-evaluator
 
-`cme` is a CLI for Claude Code marketplace health. It validates that skills route correctly and detects semantic collisions between skills — without running expensive LLM-based eval suites.
+`cme` is a CLI for Claude Code marketplace health. It validates that skills route correctly and detects functional overlap between skills — without running expensive LLM-based eval suites.
 
 Marketplace health is not about optimizing skill descriptions. It is about catching structural problems early: missing evals, broken routing, and overlapping skills that confuse Claude's router. `cme` runs fast, fits in CI, and fails loud.
 
@@ -47,20 +47,34 @@ Exit codes: `0` = all checks pass, `1` = coverage or routing threshold not met.
 
 ### `cme overlap`
 
-Detects semantic collisions between skills across a marketplace. Two skills collide when their descriptions or trigger queries are similar enough to confuse Claude's routing. Uses an LLM to analyze all skill pairs and produces a JSON report with `severity: high | medium | low` collision pairs.
+Detects functional overlap between skills across a marketplace. Two skills overlap when they perform the same action, produce the same output, or serve the same purpose — regardless of how they are triggered. Uses an LLM to analyze skill descriptions and `allowed-tools` and produces a JSON report with `severity: high | medium | low` findings.
+
+Supports two modes:
+- **Full-scan** (default): analyzes all skill pairs. Best for scheduled audits.
+- **PR-aware** (`--new-skill`): checks only new skills against the existing catalog. Best for CI on pull requests.
 
 ```bash
+# Full-scan (scheduled audit)
 cme overlap --plugins-dir plugins/ --output overlap-report.json
+
+# PR-aware (CI on new skill)
+cme overlap --plugins-dir plugins/ --new-skill plugins/my-plugin/skills/new-skill --format github
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--plugins-dir` | `plugins/` | Path to the plugins directory |
-| `--output` | `overlap-report.json` | Output path for the JSON collision report |
+| `--output` | `overlap-report.json` | Output path for the JSON report |
 | `--model` | `claude-sonnet-4-5` | Model for analysis (overrides `ANTHROPIC_MODEL` env var) |
 | `--plugin` | | Glob filter on plugin name. Repeatable with OR semantics |
+| `--new-skill` | | Path to a new skill directory. Repeatable. Enables PR-aware mode |
+| `--format` | `json` | Output format: `json` writes file, `github` prints markdown to stdout |
 
-Exit codes: `0` = no collisions, `1` = collisions detected.
+Exit codes:
+- **Full-scan mode**: `0` = no findings, `1` = any finding (HIGH, MEDIUM, or LOW)
+- **PR-aware mode**: `0` = no HIGH findings, `1` = at least one HIGH finding
+
+> **Note:** Due to LLM non-determinism in severity classification, we recommend running `cme overlap` (full-scan) on a scheduled cron rather than relying solely on PR-aware CI.
 
 The output report structure:
 
@@ -68,15 +82,19 @@ The output report structure:
 {
   "timestamp": "2026-04-17T00:00:00+00:00",
   "model_used": "claude-sonnet-4-5",
+  "mode": "full-scan",
   "total_skills_analyzed": 6,
-  "total_collisions": 1,
-  "collisions": [
+  "new_skills_checked": 0,
+  "total_findings": 1,
+  "findings": [
     {
       "skill_a": "plugins/my-plugin/skills/create-pr",
       "skill_b": "plugins/my-plugin/skills/submit-pr",
-      "overlapping_triggers": ["open a pull request"],
-      "description_excerpts": ["Both skills handle PR creation workflows"],
-      "severity": "high"
+      "functional_summary": "Both skills create GitHub pull requests from the current branch.",
+      "shared_tools": ["Bash", "Read"],
+      "severity": "high",
+      "recommendation": "Merge into a single create-pr skill.",
+      "explanation": "These skills perform identical actions — pushing a branch and opening a PR via gh CLI. A user would get the same result from either."
     }
   ]
 }
@@ -210,14 +228,13 @@ jobs:
           CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1"
         run: |
           set +e
-          uvx --from claude-marketplace-evaluator cme overlap --plugins-dir plugins/ --output overlap-report.json
+          uvx --from claude-marketplace-evaluator cme overlap --plugins-dir plugins/ --output overlap-report.json --format github
           EXIT_CODE=$?
           if [ -f overlap-report.json ]; then
             echo "## Overlap Report" >> "$GITHUB_STEP_SUMMARY"
             echo '```json' >> "$GITHUB_STEP_SUMMARY"
             cat overlap-report.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat overlap-report.json
           fi
           exit $EXIT_CODE
 ```
@@ -243,7 +260,7 @@ Extend the `overlap` job to post a formatted collision table as a PR comment usi
           CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1"
         run: |
           set +e
-          uvx --from claude-marketplace-evaluator cme overlap --plugins-dir plugins/ --output overlap-report.json
+          uvx --from claude-marketplace-evaluator cme overlap --plugins-dir plugins/ --output overlap-report.json --format github > overlap-comment.md
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           if [ -f overlap-report.json ]; then
             echo "## Overlap Report" >> "$GITHUB_STEP_SUMMARY"
@@ -258,27 +275,11 @@ Extend the `overlap` job to post a formatted collision table as a PR comment usi
         with:
           script: |
             const fs = require('fs');
-            const path = 'overlap-report.json';
-            if (!fs.existsSync(path)) return;
+            const commentPath = 'overlap-comment.md';
+            if (!fs.existsSync(commentPath)) return;
 
-            const report = JSON.parse(fs.readFileSync(path, 'utf8'));
-            const collisions = report.collisions || [];
-
-            let body = '## Skill Overlap Report\n\n';
-            body += `**Skills analyzed:** ${report.total_skills_analyzed}\n`;
-            body += `**Collisions found:** ${report.total_collisions}\n\n`;
-
-            if (collisions.length === 0) {
-              body += '✅ No semantic collisions detected.\n';
-            } else {
-              body += '| Severity | Skill A | Skill B | Overlapping Triggers |\n';
-              body += '|----------|---------|---------|---------------------|\n';
-              for (const c of collisions) {
-                const triggers = c.overlapping_triggers.join(', ');
-                body += `| ${c.severity.toUpperCase()} | \`${c.skill_a}\` | \`${c.skill_b}\` | ${triggers} |\n`;
-              }
-              body += '\nResolve collisions before merging. Rename skills, narrow descriptions, or deduplicate functionality.\n';
-            }
+            const body = fs.readFileSync(commentPath, 'utf8').trim();
+            if (!body) return;
 
             // Delete previous cme comments to avoid spam
             const { data: comments } = await github.rest.issues.listComments({
