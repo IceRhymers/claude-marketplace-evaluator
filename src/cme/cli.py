@@ -177,12 +177,32 @@ def routing(
     metavar="PATTERN",
     help="Glob filter on plugin name. Repeatable: --plugin 'git-*' --plugin 'slack-*'. OR semantics.",
 )
+@click.option(
+    "--new-skill",
+    "new_skill_paths",
+    multiple=True,
+    metavar="PATH",
+    help="Path to a new skill directory. Repeatable. Enables PR-aware mode.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    default="json",
+    type=click.Choice(["json", "github"]),
+    show_default=True,
+    help="Output format: json writes file, github prints markdown to stdout.",
+)
 def overlap(
-    plugins_dir: str, output: str, model: str | None, plugin_patterns: tuple[str, ...]
+    plugins_dir: str,
+    output: str,
+    model: str | None,
+    plugin_patterns: tuple[str, ...],
+    new_skill_paths: tuple[str, ...],
+    output_format: str,
 ) -> None:
-    """Detect semantic skill collisions across marketplace plugins."""
+    """Detect functional skill overlap across marketplace plugins."""
     from .discover import discover_plugins, filter_plugins
-    from .overlap import detect_overlap
+    from .overlap import detect_overlap, format_github_comment
 
     plugins_path = Path(plugins_dir)
     output_path = Path(output)
@@ -190,6 +210,17 @@ def overlap(
     if not plugins_path.is_dir():
         click.secho(f"ERROR: plugins dir not found: {plugins_path}", fg="red", err=True)
         raise SystemExit(1)
+
+    # Validate --new-skill paths
+    for nsp in new_skill_paths:
+        skill_dir = Path(nsp)
+        if not skill_dir.is_dir() or not (skill_dir / "SKILL.md").exists():
+            click.secho(
+                f"ERROR: --new-skill path must be a directory containing SKILL.md: {nsp}",
+                fg="red",
+                err=True,
+            )
+            raise SystemExit(1)
 
     all_plugins = discover_plugins(plugins_path)
 
@@ -208,25 +239,48 @@ def overlap(
     else:
         plugins = all_plugins
 
-    click.echo(f"Analyzing skills in {plugins_path}...")
-    report = detect_overlap(plugins_path, output_path, model=model, plugins=plugins)
+    click.echo(f"Analyzing skills in {plugins_path}...", err=True)
+    report = detect_overlap(
+        plugins_path,
+        output_path,
+        model=model,
+        plugins=plugins,
+        new_skill_paths=list(new_skill_paths) if new_skill_paths else None,
+    )
 
-    click.echo(f"\nReport written to: {output_path}")
-    click.echo(f"Skills analyzed: {report.total_skills_analyzed}")
-    click.echo(f"Collisions found: {report.total_collisions}")
+    click.echo(f"\nReport written to: {output_path}", err=True)
+    click.echo(f"Skills analyzed: {report.total_skills_analyzed}", err=True)
+    click.echo(f"Findings: {report.total_findings}", err=True)
 
-    if report.collisions:
+    if output_format == "github":
+        click.echo(format_github_comment(report))
+
+    if report.findings:
         by_severity: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
-        for c in report.collisions:
-            by_severity[c.severity] = by_severity.get(c.severity, 0) + 1
+        for f in report.findings:
+            by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
         for sev, count in by_severity.items():
             if count:
-                click.echo(f"  {sev}: {count}")
-        click.secho(
-            "\nFAILED: collisions detected — resolve before merging.",
-            fg="red",
-            err=True,
-        )
-        raise SystemExit(1)
+                click.echo(f"  {sev}: {count}", err=True)
 
-    click.echo("\nPASSED: no collisions detected.")
+        # Exit code logic differs by mode
+        if new_skill_paths:
+            # PR-aware mode: exit 1 only if any HIGH severity
+            if any(f.severity == "high" for f in report.findings):
+                click.secho(
+                    "\nFAILED: high-severity overlap detected.",
+                    fg="red",
+                    err=True,
+                )
+                raise SystemExit(1)
+            click.echo("\nPASSED: no high-severity overlaps (warnings only).", err=True)
+        else:
+            # Full-scan mode: exit 1 if ANY findings
+            click.secho(
+                "\nFAILED: functional overlaps detected — review catalog health.",
+                fg="red",
+                err=True,
+            )
+            raise SystemExit(1)
+    else:
+        click.echo("\nPASSED: no functional overlaps detected.", err=True)
