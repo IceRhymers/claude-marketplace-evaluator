@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude-marketplace-evaluator"
-version = "0.2.1"
+version = "0.3.0"
 description = "CLI for Claude Code marketplace health — routing evals, coverage checks, and semantic collision detection"
 readme = "README.md"
 license = "Apache-2.0"
