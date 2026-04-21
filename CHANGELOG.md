@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.3.0...v0.3.1) (2026-04-21)
+
+
+### Documentation
+
+* reference Anthropic skill tooling in two-tier model section ([d432573](https://github.com/IceRhymers/claude-marketplace-evaluator/commit/d432573c0959b6025f83696a74dab421f6ee5a20))
+
 ## [0.3.0](https://github.com/IceRhymers/claude-marketplace-evaluator/compare/v0.2.1...v0.3.0) (2026-04-21)
 
 
