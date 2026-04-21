@@ -4,7 +4,7 @@ install:
 	uv sync
 
 install-local:
-	uv tool install --force .
+	uv tool install --force --no-cache .
 
 uninstall-local:
 	uv tool uninstall claude-marketplace-evaluator

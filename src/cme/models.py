@@ -66,14 +66,16 @@ class CoverageReport(BaseModel):
         return self.skills_with_evals / self.total_skills * 100
 
 
-class CollisionPair(BaseModel):
-    """A detected semantic collision between two skills."""
+class OverlapFinding(BaseModel):
+    """A detected functional overlap between two skills."""
 
-    skill_a: str  # relative path, e.g. "plugins/p/skills/a"
+    skill_a: str  # relative path
     skill_b: str
-    overlapping_triggers: list[str]
-    description_excerpts: list[str]
+    functional_summary: str  # what both skills do (1 sentence)
+    shared_tools: list[str]  # allowed-tools both have in common (may be empty)
     severity: str  # "high" | "medium" | "low"
+    recommendation: str  # one-line action item
+    explanation: str  # 2-3 sentence rationale
 
 
 class OverlapReport(BaseModel):
@@ -81,6 +83,8 @@ class OverlapReport(BaseModel):
 
     timestamp: str
     model_used: str
+    mode: str  # "full-scan" | "pr-aware"
     total_skills_analyzed: int
-    total_collisions: int
-    collisions: list[CollisionPair]
+    new_skills_checked: int  # count (int), 0 in full-scan mode
+    total_findings: int
+    findings: list[OverlapFinding]
