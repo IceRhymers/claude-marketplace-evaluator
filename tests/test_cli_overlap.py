@@ -8,7 +8,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from cme.cli import main
-from cme.models import OverlapReport
+from cme.models import OverlapFinding, OverlapReport
 
 
 def _make_skill(base: Path, plugin: str, skill: str) -> None:
@@ -39,9 +39,11 @@ def test_overlap_no_collisions(tmp_path: Path) -> None:
     mock_report = OverlapReport(
         timestamp="2026-01-01T00:00:00+00:00",
         model_used="claude-sonnet-4-5",
+        mode="full-scan",
         total_skills_analyzed=2,
-        total_collisions=0,
-        collisions=[],
+        new_skills_checked=0,
+        total_findings=0,
+        findings=[],
     )
 
     output = tmp_path / "report.json"
@@ -55,26 +57,28 @@ def test_overlap_no_collisions(tmp_path: Path) -> None:
     assert "PASSED" in result.output
 
 
-def test_overlap_with_collisions_exits_nonzero(tmp_path: Path) -> None:
-    from cme.models import CollisionPair
-
+def test_overlap_with_findings_exits_nonzero(tmp_path: Path) -> None:
     plugins = tmp_path / "plugins"
     _make_skill(plugins, "p", "skill-a")
     _make_skill(plugins, "p", "skill-b")
 
-    collision = CollisionPair(
+    finding = OverlapFinding(
         skill_a="plugins/p/skills/skill-a",
         skill_b="plugins/p/skills/skill-b",
-        overlapping_triggers=["do the thing"],
-        description_excerpts=["Does skill-a things."],
+        functional_summary="Both skills do the same thing.",
+        shared_tools=["Bash"],
         severity="high",
+        recommendation="Merge into one skill.",
+        explanation="They are duplicates.",
     )
     mock_report = OverlapReport(
         timestamp="2026-01-01T00:00:00+00:00",
         model_used="claude-sonnet-4-5",
+        mode="full-scan",
         total_skills_analyzed=2,
-        total_collisions=1,
-        collisions=[collision],
+        new_skills_checked=0,
+        total_findings=1,
+        findings=[finding],
     )
 
     output = tmp_path / "report.json"
