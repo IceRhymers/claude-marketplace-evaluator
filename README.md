@@ -356,6 +356,16 @@ CME_DEBUG=1 cme routing --plugins-dir ./plugins
 
 `cme` answers "did Claude pick the right skill?" — it does not answer "did the skill produce a good result?" Use tier 1 to gate PRs cheaply, then run tier 2 for deeper validation on release candidates.
 
+### Anthropic's Tooling for Individual Skill Quality
+
+For optimizing individual skill descriptions and running per-skill correctness evals, use Anthropic's official tooling:
+
+- [anthropics/skills](https://github.com/anthropics/skills) — official skill catalog with eval framework
+- [Skill Creator evals](https://tessl.io/blog/anthropic-brings-evals-to-skill-creator-heres-why-thats-a-big-deal/) — description quality optimization built into Skill Creator
+- [Complete Guide to Building Skills](https://resources.anthropic.com/hubfs/The-Complete-Guide-to-Building-Skill-for-Claude.pdf) — Anthropic's authoritative skill authoring guide
+
+Build great skills with Anthropic's tooling, keep your marketplace healthy with `cme`. Anthropic's tools optimize each skill in isolation — description clarity, trigger accuracy, output correctness. `cme` operates at the catalog layer: does routing work across your whole marketplace, and do any skills duplicate each other's functionality?
+
 ## Development
 
 ```bash
